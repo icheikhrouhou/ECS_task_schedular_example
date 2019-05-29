@@ -1,0 +1,33 @@
+variables:
+  IMAGE: docker-image
+  REPOSITORY_URL: ecr-amazon-url
+
+.before_script: &before_script
+    - make install
+
+stages:
+- script
+- build
+
+# push scripts to s3 
+push_scipt_to_s3:
+  image: ${DIND}
+  stage: script
+  when: manual
+  before_script: *before-script
+  script:
+    - echo "pushing scripts to s3"
+    - cd terraform && make init && make plan && cd ../
+    
+# build docker 
+build_docker:
+  stage: build
+  when: manual
+  dependencies:
+    - push_scipt_to_s3
+  script:
+    - echo "Building docker image"
+    - $(aws ecr get-login --no-include-email)
+    - IMAGE_TAG="${IMAGE_NAME}:latest"
+    - docker build . -t ${REPOSITORY_URL}/$IMAGE_TAG -f dockerfile
+    - docker push ${REPOSITORY_URL}/$IMAGE_TAG   
